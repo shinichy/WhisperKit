@@ -90,7 +90,7 @@ final class RegressionTests: XCTestCase {
         memoryStats.preTranscribeMemory = Float(SystemMemoryChecker.getMemoryUsed())
 
         let transcriptionResult = try await XCTUnwrapAsync(
-            await whisperKit.transcribe(audioPath: audioFilePath, callback: callback),
+            await whisperKit.transcribe(audioPath: audioFilePath, callback: callback).first,
             "Transcription failed"
         )
         XCTAssert(transcriptionResult.text.isEmpty == false, "Transcription failed")
@@ -113,6 +113,35 @@ final class RegressionTests: XCTestCase {
             add(attachment)
         } catch {
             XCTFail("Failed with error: \(error)")
+        }
+    }
+
+    func testOutputAll() async throws {
+        let modelPaths = try allModelPaths()
+
+        for modelPath in modelPaths {
+            let modelName = modelPath.split(separator: "/").last!
+            print("[Integration] Testing model \(modelName)")
+            let audioFilePath = try XCTUnwrap(
+                Bundle.module.path(forResource: "jfk", ofType: "wav"),
+                "Audio file not found"
+            )
+
+            let whisperKit = try await WhisperKit(
+                modelFolder: modelPath,
+                verbose: true,
+                logLevel: .debug
+            )
+
+            let transcriptionResult: [TranscriptionResult] = try await whisperKit.transcribe(audioPath: audioFilePath)
+            let transcriptionResultText = transcriptionResult.text
+
+            print("[Integration] \(transcriptionResultText)")
+            XCTAssertEqual(
+                transcriptionResultText.normalized,
+                " And so my fellow Americans ask not what your country can do for you, ask what you can do for your country.".normalized,
+                "Transcription result does not match expected result for model \(modelName)"
+            )
         }
     }
 

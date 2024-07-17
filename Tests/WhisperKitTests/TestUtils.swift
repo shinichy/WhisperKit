@@ -1,4 +1,5 @@
 import CoreML
+import Combine
 import Foundation
 @testable import WhisperKit
 import XCTest
@@ -104,6 +105,7 @@ extension XCTestCase {
     func transcribe(
         with variant: ModelVariant,
         options: DecodingOptions,
+        callback: TranscriptionCallback = nil,
         audioFile: String = "jfk.wav",
         file: StaticString = #file,
         line: UInt = #line
@@ -128,7 +130,7 @@ extension XCTestCase {
         guard let audioFileURL = Bundle.module.path(forResource: audioComponents.first, ofType: audioComponents.last) else {
             throw TestError.missingFile("Missing audio file")
         }
-        return try await whisperKit.transcribe(audioPath: audioFileURL, decodeOptions: options)
+        return try await whisperKit.transcribe(audioPath: audioFileURL, decodeOptions: options, callback: callback)
     }
 
     func tinyModelPath() throws -> String {
@@ -271,5 +273,13 @@ extension Collection where Element == TranscriptionResult {
 extension Collection where Element == TranscriptionResult {
     var segments: [TranscriptionSegment] {
         flatMap(\.segments)
+    }
+}
+
+extension Publisher {
+    public func withPrevious() -> AnyPublisher<(previous: Output?, current: Output), Failure> {
+        scan((Output?, Output)?.none) { ($0?.1, $1) }
+            .compactMap { $0 }
+            .eraseToAnyPublisher()
     }
 }
